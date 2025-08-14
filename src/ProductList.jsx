@@ -1,13 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './ProductList.css'
 import CartItem from './CartItem';
 import { useSelector, useDispatch } from 'react-redux';
 import { addItem } from './CartSlice';
+import SearchFilter from './SearchFilter';
 
 function ProductList() {
     const [showCart, setShowCart] = useState(false);
-    const [showPlants, setShowPlants] = useState(false); // State to control the visibility of the About Us page
+    const [showPlants, setShowPlants] = useState(false); // reserved for future navigation
     const [addedToCart, setAddedToCart] = useState({}); // To track which products are added to cart
+
+    // Search and filter state
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [priceRange, setPriceRange] = useState({ min: '', max: '' });
+
     const cart = useSelector((state) => state.cart);
     const dispatch = useDispatch();
 
@@ -225,7 +232,7 @@ function ProductList() {
         padding: '15px',
         display: 'flex',
         justifyContent: 'space-between',
-        alignIems: 'center',
+        alignItems: 'center',
         fontSize: '20px',
     }
     const styleObjUl = {
@@ -267,6 +274,34 @@ function ProductList() {
         ));
     };
 
+    // Helpers for filtering
+    const parseCost = (costStr) => {
+        if (!costStr) return 0;
+        const num = parseFloat(String(costStr).replace(/[^0-9.]/g, ''));
+        return isNaN(num) ? 0 : num;
+    };
+
+    const categories = plantsArray.map(s => s.category);
+
+    const handleSearch = (value) => setSearchTerm(value);
+    const handleFilter = ({ category, priceRange }) => {
+        setSelectedCategory(category || '');
+        setPriceRange(priceRange || { min: '', max: '' });
+    };
+
+    const sectionMatchesCategory = (section) => {
+        return !selectedCategory || section.category === selectedCategory;
+    };
+
+    const plantMatches = (plant) => {
+        const term = searchTerm.trim().toLowerCase();
+        const matchesText = !term || plant.name.toLowerCase().includes(term) || plant.description.toLowerCase().includes(term);
+        const price = parseCost(plant.cost);
+        const minOk = priceRange.min === '' || price >= Number(priceRange.min);
+        const maxOk = priceRange.max === '' || price <= Number(priceRange.max);
+        return matchesText && minOk && maxOk;
+    };
+
 
     return (
         <div>
@@ -274,7 +309,7 @@ function ProductList() {
                 <div className="tag">
                     <div className="luxury">
                         <img src="https://cdn.pixabay.com/photo/2020/08/05/13/12/eco-5465432_1280.png" alt="" />
-                        <a href="/paradise-nursery-shopping-cart-app/" style={{ textDecoration: 'none' }}>
+                        <a href="/e-plantShopping/" style={{ textDecoration: 'none' }}>
                             <div>
                                 <h3 style={{ color: 'white' }}>Paradise Nursery</h3>
                                 <i style={{ color: 'white' }}>Where Green Meets Serenity</i>
@@ -289,23 +324,33 @@ function ProductList() {
             </div>
             {!showCart ? (
                 <div>
-                    {plantsArray.map((section, sectionIndex) => (
+                    <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+                        <SearchFilter
+                            onSearch={handleSearch}
+                            onFilter={handleFilter}
+                            categories={categories}
+                        />
+                    </div>
+                    {plantsArray.filter(sectionMatchesCategory).map((section, sectionIndex) => (
                         <div className="product-grid" key={sectionIndex}>
                             <h2 className="plant_heading">{section.category}</h2>
                             <div className="product-list">
-                                {section.plants.map((plant, plantIndex) => (
+                                {section.plants.filter(plantMatches).map((plant, plantIndex) => (
                                     <div className="product-card" key={plantIndex}>
                                         <h3 className="product-title">{plant.name}</h3>
                                         <img className="product-image" src={plant.image} alt={plant.name} />
                                         <p className="product-price">{plant.cost}</p>
                                         <p>{plant.description}</p>
                                         {cart.items.some(item => item.name === plant.name) ? (
-                                            <button className="product-button added-to-cart">Added to Cart</button>
+                                            <button className="product-button added-to-cart" disabled>Added to Cart</button>
                                         ) : (
                                             <button className="product-button" onClick={() => handleAddToCart(plant)}>Add to Cart</button>
                                         )}
                                     </div>
                                 ))}
+                                {section.plants.filter(plantMatches).length === 0 && (
+                                    <div style={{ color: '#555' }}>No plants match your criteria.</div>
+                                )}
                             </div>
                         </div>
                     ))}
